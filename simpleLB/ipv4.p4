@@ -19,9 +19,19 @@
 #include "headers.p4"
 #include "util.p4"
 
+Register<bit<32>,_>(1) lb_counter;
 
 /*TODO: define the necesssary metadata*/
 
+struct metadata_t {
+    bit<32> output_lb;
+}
+
+action action_lb(PortId_t port, mac_addr_t dst_mac)
+{
+    ig_intr_tm_md.ucast_egress_port = port;
+    hdr.ethernet.dst_addr = dst_mac;
+}
 // ---------------------------------------------------------------------------
 // Ingress parser
 // ---------------------------------------------------------------------------
@@ -94,7 +104,6 @@ control SwitchIngress(
         inout ingress_intrinsic_metadata_for_deparser_t ig_intr_dprsr_md,
         inout ingress_intrinsic_metadata_for_tm_t ig_intr_tm_md) {
 
-
     action drop_() {
         ig_intr_dprsr_md.drop_ctl = 1;
     }
@@ -104,8 +113,17 @@ control SwitchIngress(
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
 
-
     /*TODO: create register action*/
+    RegisterAction<bit<32>, _, bit<32>>(lb_counter) check_counter = {
+        void apply(inout bit<32> value, out bit<32> rv){
+            if(value == 1){
+                value = 0;
+            }else{
+                value = 1;
+            }
+            rv = value;
+        }
+    };
 
     table ipv4_lpm {
         key = {
@@ -119,8 +137,22 @@ control SwitchIngress(
     }
 
     /* TODO: Define the action LB */
-
+    action action_lb(PortId_t port, mac_addr_t dst_mac)
+    {
+        ig_intr_tm_md.ucast_egress_port = port;
+        hdr.ethernet.dst_addr = dst_mac;
+    }
     /* TODO: Define the table to match the LB parameters */
+    table def_lib{
+        key = {
+            hdr.ipv4.dst_addr: exact;
+            ig_md.output_lb: exact;
+        }
+        actions = {
+            action_lb;
+        }
+        size = 2;
+    }
 
     apply {
 
