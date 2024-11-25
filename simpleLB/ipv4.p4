@@ -19,8 +19,6 @@
 #include "headers.p4"
 #include "util.p4"
 
-Register<bit<32>,_>(1) lb_counter;
-
 /*TODO: define the necesssary metadata*/
 
 struct metadata_t {
@@ -95,6 +93,7 @@ control SwitchIngressDeparser(
 }
 
 /*TODO: register definition */
+Register<bit<32>,_>(1) lb_counter;
 
 control SwitchIngress(
         inout header_t hdr,
@@ -143,13 +142,13 @@ control SwitchIngress(
         hdr.ethernet.dst_addr = dst_mac;
     }
     /* TODO: Define the table to match the LB parameters */
-    table def_lib{
+    table def_lb {
         key = {
             hdr.ipv4.dst_addr: exact;
             ig_md.output_lb: exact;
         }
         actions = {
-            action_lb;
+            action_lb;           
         }
         size = 2;
     }
@@ -160,9 +159,10 @@ control SwitchIngress(
             ipv4_lpm.apply();
         }
 
-	/* TODO: Instantiate the register action */  
+	    /* TODO: Instantiate the register action */  
+        ig_md.output_lb = check_counter.execute(0); 
         /* TODO: Apply the table */
-        
+        def_lb.apply();
         ig_intr_tm_md.bypass_egress = 1w1;
     }
 }
